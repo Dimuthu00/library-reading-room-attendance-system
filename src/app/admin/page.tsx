@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { createStaffAccount } from "@/app/actions/staff"; // IMPORT OUR NEW BACKEND ACTION
+import {
+  createStaffAccount,
+  getStaffList,
+  deleteStaffAccount,
+} from "@/app/actions/staff"; // IMPORT OUR NEW BACKEND ACTION
 
 type AttendanceLog = {
   id: string;
@@ -38,6 +42,9 @@ export default function AdminDashboard() {
     msg: string;
   } | null>(null);
 
+  // NEW State for Staff Directory
+  const [staffList, setStaffList] = useState<any[]>([]);
+
   const supabase = createClient();
   const router = useRouter();
 
@@ -48,19 +55,22 @@ export default function AdminDashboard() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      console.log("1. Logged in user:", user?.email); // DEBUG LINE
-
       if (user) {
-        const { data: profile, error } = await supabase
+        const { data: profile } = await supabase
           .from("profiles")
           .select("role")
           .eq("id", user.id)
           .single();
 
-        console.log("2. Profile data fetched:", profile); // DEBUG LINE
-        console.log("3. Any errors?", error); // DEBUG LINE
+        if (profile) {
+          setUserRole(profile.role);
 
-        if (profile) setUserRole(profile.role);
+          // NEW: If they are an Admin, fetch the list of all staff!
+          if (profile.role === "ADMIN") {
+            const staffRes = await getStaffList();
+            if (staffRes.success) setStaffList(staffRes.data);
+          }
+        }
       }
     };
 
@@ -346,6 +356,72 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* STAFF DIRECTORY (ADMIN ONLY) */}
+      {userRole === "ADMIN" && (
+        <div className="mt-12">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">
+            System Administration: Staff Directory
+          </h2>
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-100 text-gray-600 font-medium border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-4">Name</th>
+                  <th className="px-6 py-4">Email</th>
+                  <th className="px-6 py-4">Role</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {staffList.map((staff) => (
+                  <tr key={staff.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 font-medium text-gray-900">
+                      {staff.full_name}
+                    </td>
+                    <td className="px-6 py-4 text-gray-500">{staff.email}</td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${
+                          staff.role === "ADMIN"
+                            ? "bg-purple-100 text-purple-700"
+                            : "bg-blue-100 text-blue-700"
+                        }`}
+                      >
+                        {staff.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        onClick={async () => {
+                          if (
+                            confirm(
+                              `Are you sure you want to delete ${staff.full_name}'s account? This cannot be undone.`,
+                            )
+                          ) {
+                            const res = await deleteStaffAccount(staff.id);
+                            if (res.success) {
+                              // Remove them from the screen instantly
+                              setStaffList(
+                                staffList.filter((s) => s.id !== staff.id),
+                              );
+                            } else {
+                              alert(res.message);
+                            }
+                          }
+                        }}
+                        className="text-rose-600 hover:text-rose-800 font-medium px-3 py-1 bg-rose-50 rounded-lg hover:bg-rose-100 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* QR GENERATOR MODAL (Hidden by default) */}
       {showQRModal && (
