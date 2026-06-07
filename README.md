@@ -42,5 +42,5 @@ The system utilizes three primary tables secured via Row Level Security (RLS):
 
 ### 1. Clone the repository
 ```bash
-git clone [https://github.com/Dimuthu00/library-reading-room-attendance-system.git](https://github.com/Dimuthu00/library-reading-room-attendance-system.git)
+git clone https://github.com/Dimuthu00/library-reading-room-attendance-system.git
 cd library-reading-room-attendance-system
