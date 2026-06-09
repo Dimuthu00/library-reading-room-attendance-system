@@ -166,65 +166,69 @@ export default function AdminDashboard() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900 p-8">
+    <main className="min-h-screen bg-[#f4f2ee] text-[#7d5b4a] p-8 font-sans">
       <div className="max-w-6xl mx-auto">
         {/* Header section updated with Sign Out and Role Badge */}
-        <header className="flex justify-between items-end mb-8 border-b pb-4">
+        <header className="flex justify-between items-end mb-8 border-b border-[#efe6df] pb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">
+              <h1 className="text-4xl font-semibold tracking-tight text-[#7d5b4a]">
                 Reading Room Dashboard
               </h1>
               {/* Show their Role Badge */}
               {userRole && (
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${
+                  className={`px-3 py-1 rounded-full text-sm font-bold tracking-wider ${
                     userRole === "ADMIN"
-                      ? "bg-purple-100 text-purple-700"
-                      : "bg-blue-100 text-blue-700"
+                      ? "bg-[#dfc4a2]/40 text-[#7d5b4a]"
+                      : "bg-[#f1e7df]/40 text-[#7d5b4a]"
                   }`}
                 >
                   {userRole}
                 </span>
               )}
             </div>
-            <p className="text-gray-500 mt-1">
+            <p className="text-[#a89689] mt-2 text-lg">
               Live attendance monitoring system
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-[#efe6df]">
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
               </span>
-              <span className="text-sm font-semibold text-gray-700">
+              <span className="text-sm font-semibold text-[#7d5b4a]">
                 System Live
               </span>
             </div>
             <button
               onClick={handleSignOut}
-              className="text-sm text-gray-500 hover:text-gray-900 underline"
+              className="flex items-center gap-2 bg-white border border-[#efe6df] text-[#7d5b4a] px-3 py-2 rounded-lg hover:bg-[#fff3ea] shadow-sm"
+              aria-label="Sign out"
             >
-              Sign Out
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1" />
+              </svg>
+              <span className="text-sm font-medium">Sign Out</span>
             </button>
           </div>
         </header>
 
         {/* ADMIN ONLY CONTROLS */}
         {userRole === "ADMIN" && (
-          <div className="mb-8 flex gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="mb-8 flex gap-4 bg-white p-4 rounded-2xl shadow-sm border border-[#efe6df]">
             <button
               onClick={() => setShowQRModal(true)}
-              className="bg-gray-900 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+              className="bg-[#e3c4a2] text-[#7d5b4a] px-4 py-2 rounded-xl font-medium hover:bg-[#d6b48f] transition-colors"
             >
               + Generate Student Pass
             </button>
             {/* NEW BUTTON */}
             <button
               onClick={() => setShowStaffModal(true)}
-              className="bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg font-medium hover:bg-blue-100 transition-colors"
+              className="bg-[#fffaf8] text-[#7d5b4a] border border-[#efe6df] px-4 py-2 rounded-xl font-medium hover:bg-[#fff3ea] transition-colors"
             >
               + Create Staff Account
             </button>
@@ -233,29 +237,29 @@ export default function AdminDashboard() {
 
         {/* Analytics Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#efe6df]">
+            <h3 className="text-[#a89689] text-sm font-medium mb-1">
               Currently Inside
             </h3>
-            <p className="text-4xl font-bold text-blue-600">{activeCount}</p>
+            <p className="text-4xl font-bold text-[#7d5b4a]">{activeCount}</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h3 className="text-gray-500 text-sm font-medium mb-1">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#efe6df]">
+            <h3 className="text-[#a89689] text-sm font-medium mb-1">
               Total Scans (Today)
             </h3>
-            <p className="text-4xl font-bold text-gray-800">{logs.length}</p>
+            <p className="text-4xl font-bold text-[#7d5b4a]">{logs.length}</p>
           </div>
         </div>
 
         {/* Table Header & Export Controls */}
         <div className="flex justify-between items-end mb-4 mt-8">
-          <h2 className="text-xl font-bold text-gray-900">
+          <h2 className="text-2xl font-semibold text-[#7d5b4a]">
             Recent Attendance Logs
           </h2>
           <button
             onClick={exportToCSV}
             disabled={logs.length === 0 || loading}
-            className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-lg font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 bg-[#f1f6f2] text-emerald-700 border border-[#e6efe8] px-4 py-2 rounded-lg font-medium hover:bg-[#eef8ee] transition-colors disabled:opacity-50"
           >
             <svg
               className="w-4 h-4"
@@ -275,10 +279,10 @@ export default function AdminDashboard() {
         </div>
 
         {/* Data Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-[#efe6df] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-100 text-gray-600 font-medium border-b border-gray-200">
+            <table className="w-full text-left text-base">
+              <thead className="bg-[#fffaf8] text-[#7d5b4a] font-medium border-b border-[#efe6df]">
                 <tr>
                   <th className="px-6 py-4">Student</th>
                   <th className="px-6 py-4">ID Number</th>
@@ -287,12 +291,12 @@ export default function AdminDashboard() {
                   <th className="px-6 py-4">Check Out</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[#f0e9e2]">
                 {loading ? (
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-6 py-8 text-center text-gray-500"
+                      className="px-6 py-8 text-center text-[#a89689]"
                     >
                       Loading secure data...
                     </td>
@@ -301,7 +305,7 @@ export default function AdminDashboard() {
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-6 py-8 text-center text-gray-500"
+                      className="px-6 py-8 text-center text-[#a89689]"
                     >
                       No attendance records found yet.
                     </td>
@@ -310,33 +314,33 @@ export default function AdminDashboard() {
                   logs.map((log) => (
                     <tr
                       key={log.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className="hover:bg-[#fffaf8] transition-colors"
                     >
-                      <td className="px-6 py-4 font-medium text-gray-900">
+                      <td className="px-6 py-4 font-medium text-[#7d5b4a]">
                         {log.students?.full_name || "Unknown"}
                       </td>
-                      <td className="px-6 py-4 font-mono text-gray-500">
+                      <td className="px-6 py-4 font-mono text-[#a89689]">
                         {log.student_id}
                       </td>
                       <td className="px-6 py-4">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-bold tracking-wider ${
                             log.status === "IN"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-gray-100 text-gray-600"
+                              ? "bg-[#e6f6ef] text-emerald-700"
+                              : "bg-[#fff3ea] text-[#a89689]"
                           }`}
                         >
                           {log.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-6 py-4 text-[#a89689]">
                         {new Date(log.check_in_time).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
                           second: "2-digit",
                         })}
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      <td className="px-6 py-4 text-[#a89689]">
                         {log.check_out_time
                           ? new Date(log.check_out_time).toLocaleTimeString(
                               [],
@@ -438,7 +442,7 @@ export default function AdminDashboard() {
             </button>
             <h2 className="text-xl font-bold mb-4">Generate Student Pass</h2>
             <p className="text-sm text-gray-500 mb-6">
-              Enter the exact Student ID (e.g., ENG/2026/001) to generate their
+              Enter the exact Student ID (e.g., EG/2026/001) to generate their
               secure QR code.
             </p>
 
@@ -534,7 +538,7 @@ export default function AdminDashboard() {
                     onChange={(e) =>
                       setStaffForm({ ...staffForm, fullName: e.target.value })
                     }
-                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-yellow-500"
                   />
                 </div>
                 <div>
@@ -548,7 +552,7 @@ export default function AdminDashboard() {
                     onChange={(e) =>
                       setStaffForm({ ...staffForm, email: e.target.value })
                     }
-                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-yellow-500"
                   />
                 </div>
                 <div>
@@ -563,7 +567,7 @@ export default function AdminDashboard() {
                     onChange={(e) =>
                       setStaffForm({ ...staffForm, password: e.target.value })
                     }
-                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-yellow-500"
                   />
                 </div>
                 <div>
@@ -575,7 +579,7 @@ export default function AdminDashboard() {
                     onChange={(e) =>
                       setStaffForm({ ...staffForm, role: e.target.value })
                     }
-                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
                   >
                     <option value="STAFF">Staff (View Only)</option>
                     <option value="ADMIN">Admin (Full Access)</option>
@@ -585,7 +589,7 @@ export default function AdminDashboard() {
               <button
                 type="submit"
                 disabled={staffLoading}
-                className="w-full bg-blue-600 text-white font-medium py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="w-full bg-yellow-600 text-white font-medium py-2 rounded-lg hover:bg-yellow-700 disabled:opacity-50"
               >
                 {staffLoading ? "Creating..." : "Create Account"}
               </button>
