@@ -38,23 +38,23 @@ export default function KioskScanner() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-900 text-white p-6">
-      <div className="text-center mb-8">
-        <h1 className="text-4xl font-extrabold tracking-tight mb-2">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#f4f2ee] text-[#7d5b4a] p-6 font-sans">
+      <div className="text-center mb-10">
+        <h1 className="text-5xl font-semibold tracking-tight mb-3 text-[#7d5b4a]">
           Library Reading Room
         </h1>
-        <p className="text-gray-400 text-lg">
+        <p className="text-[#a89689] text-xl">
           Self-Service 24/7 Attendance Gateway
         </p>
       </div>
 
-      <div className="relative w-full max-w-md aspect-square bg-black rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-800 flex items-center justify-center">
+      <div className="relative w-full max-w-lg aspect-square bg-white rounded-4xl overflow-hidden shadow-[0_20px_60px_rgba(125,91,74,0.14)] border border-[#efe6df] flex items-center justify-center">
         {/* Display Camera Permission Error if it happens */}
         {cameraError ? (
-          <div className="text-center p-6 text-rose-400">
-            <div className="text-4xl mb-4">📷</div>
-            <p className="font-semibold">{cameraError}</p>
-            <p className="text-sm mt-2 text-gray-500">
+          <div className="text-center p-6 text-[#d87c5f]">
+            <div className="text-5xl mb-4">📷</div>
+            <p className="font-semibold text-lg">{cameraError}</p>
+            <p className="text-base mt-2 text-[#a89689] leading-relaxed max-w-sm mx-auto">
               Please click the lock icon in your URL bar to allow camera access,
               then refresh.
             </p>
@@ -83,9 +83,9 @@ export default function KioskScanner() {
               }}
               // You can remove the delay options as v2 handles it automatically better
             />
-            <div className="absolute inset-0 border-2 border-dashed border-white/30 m-16 rounded-xl pointer-events-none flex items-center justify-center">
+            <div className="absolute inset-0 border-2 border-dashed border-[#dfc4a2] m-16 rounded-3xl pointer-events-none flex items-center justify-center bg-white/5">
               {status === "processing" && (
-                <div className="bg-black/60 px-4 py-2 rounded-lg text-sm font-medium tracking-wide animate-pulse">
+                <div className="bg-[#7d5b4a]/90 text-white px-5 py-3 rounded-xl text-base font-medium tracking-wide animate-pulse shadow-lg">
                   Verifying Credentials...
                 </div>
               )}
@@ -96,23 +96,23 @@ export default function KioskScanner() {
         {status === "success" && feedback && (
           <div
             className={`absolute inset-0 flex flex-col items-center justify-center p-6 text-center animate-fade-in ${
-              feedback.type === "CHECK_IN" ? "bg-emerald-950" : "bg-blue-950"
+              feedback.type === "CHECK_IN" ? "bg-[#e9f6ef]" : "bg-[#fff3ea]"
             }`}
           >
             <div
               className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 text-4xl ${
                 feedback.type === "CHECK_IN"
-                  ? "bg-emerald-500/20 text-emerald-400"
-                  : "bg-blue-500/20 text-blue-400"
+                  ? "bg-emerald-100 text-emerald-600"
+                  : "bg-[#f0dfd8] text-[#d87c5f]"
               }`}
             >
               {feedback.type === "CHECK_IN" ? "✓" : "→"}
             </div>
-            <h2 className="text-3xl font-bold mb-2">{feedback.studentName}</h2>
-            <p className="text-xl font-medium opacity-90 mb-1">
+            <h2 className="text-4xl font-semibold mb-2 text-[#7d5b4a]">{feedback.studentName}</h2>
+            <p className="text-2xl font-medium text-[#a89689] mb-1">
               {feedback.message}
             </p>
-            <span className="text-xs uppercase tracking-widest opacity-50 mt-4">
+            <span className="text-sm uppercase tracking-widest text-[#bcaaa0] mt-4">
               Status:{" "}
               {feedback.type === "CHECK_IN" ? "Checked In" : "Checked Out"}
             </span>
@@ -120,19 +120,19 @@ export default function KioskScanner() {
         )}
 
         {status === "error" && feedback && (
-          <div className="absolute inset-0 bg-rose-950 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-            <div className="w-20 h-20 bg-rose-500/20 text-rose-400 rounded-full flex items-center justify-center mb-6 text-4xl font-bold">
+          <div className="absolute inset-0 bg-[#fff3ea] flex flex-col items-center justify-center p-6 text-center animate-fade-in">
+            <div className="w-20 h-20 bg-[#f0dfd8] text-[#d87c5f] rounded-full flex items-center justify-center mb-6 text-4xl font-bold">
               ✕
             </div>
-            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
-            <p className="text-lg opacity-80 max-w-xs">{feedback.message}</p>
+            <h2 className="text-3xl font-semibold mb-2 text-[#7d5b4a]">Access Denied</h2>
+            <p className="text-xl text-[#a89689] max-w-xs">{feedback.message}</p>
           </div>
         )}
       </div>
 
       <div className="mt-8 text-center h-6">
         {status === "idle" && !cameraError && (
-          <p className="text-gray-500 text-sm tracking-wide animate-pulse">
+          <p className="text-[#a89689] text-base tracking-wide animate-pulse">
             Position your QR code within the camera frame
           </p>
         )}
