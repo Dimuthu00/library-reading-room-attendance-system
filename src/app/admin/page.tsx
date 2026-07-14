@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { QRCodeSVG } from "qrcode.react";
+import { QRCodeCanvas } from "qrcode.react";
 import { createClient } from "@/lib/supabase";
 import {
   createStaffAccount,
@@ -12,6 +12,8 @@ import {
 
 type UserRole = "ADMIN" | "STAFF";
 type DashboardView = "overview" | "live";
+type Gender = "MALE" | "FEMALE" | "OTHER";
+type Department = "ELECTRICAL" | "MECHANICAL" | "CIVIL" | "COMPUTER";
 
 type AttendanceLog = {
   id: string;
@@ -21,6 +23,9 @@ type AttendanceLog = {
   status: "IN" | "OUT";
   students: {
     full_name: string;
+    email: string | null;
+    gender: Gender | null;
+    department: Department | null;
   } | null;
 };
 
@@ -79,21 +84,19 @@ function getSessionMinutes(log: AttendanceLog, now: number) {
   return Math.max(0, (end - start) / 60000);
 }
 
-function getDepartmentLabel(studentId: string) {
-  // Your current students table contains only student_id and full_name.
-  // This keeps the dashboard useful until a department column is added.
-  const prefix = studentId.split("/")[0]?.toUpperCase() || "OTHER";
+function formatGender(gender: Gender | null | undefined) {
+  if (gender === "MALE") return "Male";
+  if (gender === "FEMALE") return "Female";
+  if (gender === "OTHER") return "Other";
+  return "Unspecified";
+}
 
-  const knownPrefixes: Record<string, string> = {
-    EG: "Engineering",
-    DEIE: "DEIE",
-    DCSE: "DCSE",
-    DCME: "DCME",
-    DCSEI: "DCSE",
-    DCEE: "DCEE",
-  };
-
-  return knownPrefixes[prefix] ?? prefix;
+function formatDepartment(department: Department | null | undefined) {
+  if (department === "ELECTRICAL") return "Electrical";
+  if (department === "MECHANICAL") return "Mechanical";
+  if (department === "CIVIL") return "Civil";
+  if (department === "COMPUTER") return "Computer";
+  return "Unspecified";
 }
 
 function Icon({
@@ -101,16 +104,17 @@ function Icon({
   className = "h-5 w-5",
 }: {
   name:
-    | "users"
-    | "calendar"
-    | "clock"
-    | "capacity"
-    | "download"
-    | "logout"
-    | "plus"
-    | "close"
-    | "activity"
-    | "list";
+  | "users"
+  | "calendar"
+  | "clock"
+  | "capacity"
+  | "download"
+  | "logout"
+  | "plus"
+  | "close"
+  | "activity"
+  | "list"
+  | "mail";
   className?: string;
 }) {
   const common = {
@@ -171,6 +175,12 @@ function Icon({
         <circle cx="3.5" cy="18" r="1" fill="currentColor" stroke="none" />
       </>
     ),
+    mail: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="2" strokeWidth="1.8" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="m4 7 8 6 8-6" />
+      </>
+    ),
   };
 
   return <svg {...common}>{paths[name]}</svg>;
@@ -190,6 +200,14 @@ export default function AdminDashboard() {
 
   const [showQRModal, setShowQRModal] = useState(false);
   const [newStudentId, setNewStudentId] = useState("");
+  const [newStudentName, setNewStudentName] = useState("");
+  const [newStudentEmail, setNewStudentEmail] = useState("");
+  const [newStudentGender, setNewStudentGender] = useState<Gender>("MALE");
+  const [newStudentDepartment, setNewStudentDepartment] =
+    useState<Department>("ELECTRICAL");
+  const [qrSending, setQrSending] = useState(false);
+  const [qrFeedback, setQrFeedback] = useState<StaffFeedback | null>(null);
+  const qrCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [showStaffModal, setShowStaffModal] = useState(false);
   const [staffForm, setStaffForm] = useState({
@@ -239,7 +257,7 @@ export default function AdminDashboard() {
       const { data, error } = await supabase
         .from("attendance_logs")
         .select(
-          "id, student_id, check_in_time, check_out_time, status, students ( full_name )",
+          "id, student_id, check_in_time, check_out_time, status, students ( full_name, email, gender, department )",
         )
         .order("check_in_time", { ascending: false })
         .limit(MAX_LOGS);
@@ -321,25 +339,57 @@ export default function AdminDashboard() {
   const busiestHourCount = Math.max(1, ...hourlyTraffic.map((item) => item.count));
 
   const departmentData = useMemo(() => {
-    const counts = new Map<string, number>();
+    const departments: Department[] = [
+      "ELECTRICAL",
+      "MECHANICAL",
+      "CIVIL",
+      "COMPUTER",
+    ];
 
-    for (const log of activeLogs) {
-      const department = getDepartmentLabel(log.student_id);
-      counts.set(department, (counts.get(department) ?? 0) + 1);
-    }
+    return departments.map((department) => {
+      const count = activeLogs.filter(
+        (log) => log.students?.department === department,
+      ).length;
 
-    return Array.from(counts.entries())
-      .map(([name, count]) => ({
-        name,
+      return {
+        key: department,
+        name: formatDepartment(department),
         count,
         percentage:
           activeLogs.length === 0
             ? 0
             : Math.round((count / activeLogs.length) * 100),
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
+      };
+    });
   }, [activeLogs]);
+
+  const genderData = useMemo(() => {
+    const genders: Gender[] = ["MALE", "FEMALE", "OTHER"];
+
+    return genders.map((gender) => {
+      const count = activeLogs.filter(
+        (log) => log.students?.gender === gender,
+      ).length;
+
+      return {
+        key: gender,
+        name: formatGender(gender),
+        count,
+        percentage:
+          activeLogs.length === 0
+            ? 0
+            : Math.round((count / activeLogs.length) * 100),
+      };
+    });
+  }, [activeLogs]);
+
+  const unspecifiedGenderCount = activeLogs.filter(
+    (log) => !log.students?.gender,
+  ).length;
+
+  const unspecifiedDepartmentCount = activeLogs.filter(
+    (log) => !log.students?.department,
+  ).length;
 
   const lastScan = logs[0] ?? null;
 
@@ -355,6 +405,8 @@ export default function AdminDashboard() {
     const headers = [
       "Student Name",
       "ID Number",
+      "Gender",
+      "Department",
       "Status",
       "Check In Time",
       "Check Out Time",
@@ -364,6 +416,8 @@ export default function AdminDashboard() {
     const rows = logs.map((log) => [
       escapeCell(log.students?.full_name || "Unknown"),
       escapeCell(log.student_id),
+      escapeCell(formatGender(log.students?.gender)),
+      escapeCell(formatDepartment(log.students?.department)),
       escapeCell(log.status),
       escapeCell(new Date(log.check_in_time).toLocaleString()),
       escapeCell(
@@ -384,6 +438,200 @@ export default function AdminDashboard() {
     anchor.download = `Library_Attendance_${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
+  };
+
+  const saveStudentProfile = async () => {
+    const studentId = newStudentId.trim().toUpperCase();
+    const fullName = newStudentName.trim();
+    const email = newStudentEmail.trim().toLowerCase();
+
+    if (studentId.length < 4) {
+      throw new Error("Enter a valid student ID.");
+    }
+
+    if (!fullName) {
+      throw new Error("Enter the student's full name.");
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      throw new Error("Enter a valid student email address.");
+    }
+
+    const { error } = await supabase.from("students").upsert(
+      {
+        student_id: studentId,
+        full_name: fullName,
+        email,
+        gender: newStudentGender,
+        department: newStudentDepartment,
+      },
+      { onConflict: "student_id" },
+    );
+
+    if (error) {
+      console.error("Unable to save student profile:", error);
+      throw new Error(
+        "Unable to save the student. Check the students table columns and Supabase policies.",
+      );
+    }
+  };
+
+  const createStudentPassDataUrl = async () => {
+    const qrCanvas = qrCanvasRef.current;
+    const studentId = newStudentId.trim().toUpperCase();
+    const studentName = newStudentName.trim();
+
+    if (!qrCanvas || studentId.length < 4) {
+      throw new Error("Enter a valid student ID before creating the pass.");
+    }
+
+    const passCanvas = document.createElement("canvas");
+    passCanvas.width = 900;
+    passCanvas.height = 1120;
+
+    const context = passCanvas.getContext("2d");
+    if (!context) {
+      throw new Error("Your browser could not create the QR pass image.");
+    }
+
+    context.fillStyle = "#fff8df";
+    context.fillRect(0, 0, passCanvas.width, passCanvas.height);
+
+    context.fillStyle = "#5f0a0c";
+    context.fillRect(0, 0, passCanvas.width, 250);
+
+    try {
+      const logo = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new window.Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("University logo could not be loaded."));
+        image.src = "/ruhuna-logo.png";
+      });
+
+      context.save();
+      context.beginPath();
+      context.arc(450, 105, 72, 0, Math.PI * 2);
+      context.clip();
+      context.drawImage(logo, 378, 33, 144, 144);
+      context.restore();
+
+      context.lineWidth = 6;
+      context.strokeStyle = "#f5ba1d";
+      context.beginPath();
+      context.arc(450, 105, 75, 0, Math.PI * 2);
+      context.stroke();
+    } catch (error) {
+      console.warn(error);
+    }
+
+    context.textAlign = "center";
+    context.fillStyle = "#f5ba1d";
+    context.font = "700 34px Arial, sans-serif";
+    context.fillText("READING ROOM STUDENT PASS", 450, 215);
+
+    context.fillStyle = "#5f0a0c";
+    context.font = "700 42px Arial, sans-serif";
+    context.fillText(studentName || "Student Pass", 450, 315);
+
+    context.fillStyle = "#7d5b4a";
+    context.font = "500 25px Arial, sans-serif";
+    context.fillText("Faculty of Engineering · University of Ruhuna", 450, 358);
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(140, 400, 620, 620);
+    context.drawImage(qrCanvas, 175, 435, 550, 550);
+
+    context.fillStyle = "#5f0a0c";
+    context.font = "700 38px monospace";
+    context.fillText(studentId, 450, 1065);
+
+    context.fillStyle = "#8a715f";
+    context.font = "500 19px Arial, sans-serif";
+    context.fillText("Present this QR code at the reading room scanner.", 450, 1097);
+
+    return passCanvas.toDataURL("image/png", 1);
+  };
+
+  const downloadStudentPass = async () => {
+    setQrFeedback(null);
+
+    try {
+      await saveStudentProfile();
+      const dataUrl = await createStudentPassDataUrl();
+      const studentId = newStudentId.trim().toUpperCase();
+      const anchor = document.createElement("a");
+
+      anchor.href = dataUrl;
+      anchor.download = `${studentId.replaceAll("/", "-")}-reading-room-pass.png`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+
+      setQrFeedback({
+        success: true,
+        msg: "The student QR pass was downloaded successfully.",
+      });
+    } catch (error) {
+      setQrFeedback({
+        success: false,
+        msg: error instanceof Error ? error.message : "Unable to download the QR pass.",
+      });
+    }
+  };
+
+  const sendStudentPassByEmail = async () => {
+    const studentId = newStudentId.trim().toUpperCase();
+    const email = newStudentEmail.trim().toLowerCase();
+
+    setQrFeedback(null);
+
+    if (studentId.length < 4) {
+      setQrFeedback({ success: false, msg: "Enter a valid student ID." });
+      return;
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      setQrFeedback({ success: false, msg: "Enter a valid student email address." });
+      return;
+    }
+
+    setQrSending(true);
+
+    try {
+      await saveStudentProfile();
+      const qrDataUrl = await createStudentPassDataUrl();
+      const response = await fetch("/api/send-qr", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentId,
+          studentName: newStudentName.trim(),
+          email,
+          qrDataUrl,
+        }),
+      });
+
+      const result = (await response.json()) as {
+        success?: boolean;
+        message?: string;
+      };
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || "The email could not be sent.");
+      }
+
+      setQrFeedback({
+        success: true,
+        msg: `QR pass sent successfully to ${email}.`,
+      });
+    } catch (error) {
+      setQrFeedback({
+        success: false,
+        msg: error instanceof Error ? error.message : "The email could not be sent.",
+      });
+    } finally {
+      setQrSending(false);
+    }
   };
 
   const handleCreateStaff = async (event: FormEvent<HTMLFormElement>) => {
@@ -497,11 +745,10 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setView("overview")}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${
-                view === "overview"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${view === "overview"
                   ? "bg-[#5f0a0c] text-[#f5ba1d] shadow-sm"
                   : "text-[#5f0a0c]/70 hover:text-[#5f0a0c]"
-              }`}
+                }`}
             >
               <Icon name="activity" className="h-4 w-4" />
               Overview
@@ -509,11 +756,10 @@ export default function AdminDashboard() {
             <button
               type="button"
               onClick={() => setView("live")}
-              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${
-                view === "live"
+              className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${view === "live"
                   ? "bg-[#5f0a0c] text-[#f5ba1d] shadow-sm"
                   : "text-[#5f0a0c]/70 hover:text-[#5f0a0c]"
-              }`}
+                }`}
             >
               <Icon name="users" className="h-4 w-4" />
               Live View
@@ -590,9 +836,8 @@ export default function AdminDashboard() {
                         className="flex items-start gap-3 px-5 py-3.5 transition hover:bg-[#fff9e9]"
                       >
                         <span
-                          className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                            log.status === "IN" ? "bg-emerald-500" : "bg-[#d58a14]"
-                          }`}
+                          className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${log.status === "IN" ? "bg-emerald-500" : "bg-[#d58a14]"
+                            }`}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm text-[#5f0a0c]">
@@ -646,39 +891,23 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-[#e2d3ad] bg-white p-5 shadow-sm">
-                  <h2 className="font-semibold text-[#5f0a0c]">Current Students by Department</h2>
-                  <p className="mt-0.5 text-xs text-[#87776a]">
-                    Calculated from the student ID prefix
-                  </p>
+                <DistributionCard
+                  title="Current Students by Department"
+                  subtitle="Electrical, Mechanical, Civil and Computer"
+                  rows={departmentData}
+                  emptyText="No students are currently inside."
+                  unspecifiedCount={unspecifiedDepartmentCount}
+                  unspecifiedLabel="Department not assigned"
+                />
 
-                  <div className="mt-5 space-y-3">
-                    {departmentData.length === 0 ? (
-                      <p className="py-4 text-center text-sm text-[#87776a]">
-                        No students are currently inside.
-                      </p>
-                    ) : (
-                      departmentData.map((department) => (
-                        <div key={department.name}>
-                          <div className="mb-1.5 flex items-center justify-between text-sm">
-                            <span className="font-medium text-[#4b1719]">
-                              {department.name}
-                            </span>
-                            <span className="text-[#7d6b5d]">
-                              {department.count} · {department.percentage}%
-                            </span>
-                          </div>
-                          <div className="h-1.5 overflow-hidden rounded-full bg-[#efe7cf]">
-                            <div
-                              className="h-full rounded-full bg-[#f5ba1d]"
-                              style={{ width: `${department.percentage}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <DistributionCard
+                  title="Current Students by Gender"
+                  subtitle="Live gender distribution inside the reading room"
+                  rows={genderData}
+                  emptyText="No students are currently inside."
+                  unspecifiedCount={unspecifiedGenderCount}
+                  unspecifiedLabel="Gender not assigned"
+                />
               </div>
             </section>
 
@@ -741,6 +970,7 @@ export default function AdminDashboard() {
                   <thead className="border-b border-[#efe4c3] bg-[#fff9e9] text-xs uppercase tracking-[0.08em] text-[#7d6b5d]">
                     <tr>
                       <th className="px-5 py-3.5 font-semibold">Student</th>
+                      <th className="px-5 py-3.5 font-semibold">Gender</th>
                       <th className="px-5 py-3.5 font-semibold">Department</th>
                       <th className="px-5 py-3.5 font-semibold">Check-in</th>
                       <th className="px-5 py-3.5 font-semibold">Duration</th>
@@ -749,13 +979,13 @@ export default function AdminDashboard() {
                   <tbody className="divide-y divide-[#f3ead1]">
                     {loading ? (
                       <tr>
-                        <td colSpan={4}>
+                        <td colSpan={5}>
                           <EmptyState text="Loading live attendance..." />
                         </td>
                       </tr>
                     ) : activeLogs.length === 0 ? (
                       <tr>
-                        <td colSpan={4}>
+                        <td colSpan={5}>
                           <EmptyState text="No students are currently inside." />
                         </td>
                       </tr>
@@ -771,8 +1001,13 @@ export default function AdminDashboard() {
                             </p>
                           </td>
                           <td className="px-5 py-4">
+                            <span className="rounded-full bg-[#f8eadf] px-2.5 py-1 text-xs font-semibold text-[#5f0a0c]">
+                              {formatGender(log.students?.gender)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-4">
                             <span className="rounded-full bg-[#fff0b8] px-2.5 py-1 text-xs font-semibold text-[#5f0a0c]">
-                              {getDepartmentLabel(log.student_id)}
+                              {formatDepartment(log.students?.department)}
                             </span>
                           </td>
                           <td className="px-5 py-4 text-[#766558]">
@@ -828,11 +1063,10 @@ export default function AdminDashboard() {
                     </p>
                     <div className="mt-4 flex items-center justify-between rounded-xl bg-[#fff7dd] px-4 py-3 text-sm">
                       <span
-                        className={`font-semibold ${
-                          lastScan.status === "IN"
+                        className={`font-semibold ${lastScan.status === "IN"
                             ? "text-emerald-700"
                             : "text-[#7a4a1e]"
-                        }`}
+                          }`}
                       >
                         {lastScan.status === "IN" ? "Checked in" : "Checked out"}
                       </span>
@@ -879,6 +1113,8 @@ export default function AdminDashboard() {
                   <tr>
                     <th className="px-6 py-4 font-semibold">Student</th>
                     <th className="px-6 py-4 font-semibold">ID Number</th>
+                    <th className="px-6 py-4 font-semibold">Gender</th>
+                    <th className="px-6 py-4 font-semibold">Department</th>
                     <th className="px-6 py-4 font-semibold">Status</th>
                     <th className="px-6 py-4 font-semibold">Check In</th>
                     <th className="px-6 py-4 font-semibold">Check Out</th>
@@ -888,13 +1124,13 @@ export default function AdminDashboard() {
                 <tbody className="divide-y divide-[#f3ead1]">
                   {loading ? (
                     <tr>
-                      <td colSpan={6}>
+                      <td colSpan={8}>
                         <EmptyState text="Loading secure data..." />
                       </td>
                     </tr>
                   ) : logs.length === 0 ? (
                     <tr>
-                      <td colSpan={6}>
+                      <td colSpan={8}>
                         <EmptyState text="No attendance records found yet." />
                       </td>
                     </tr>
@@ -907,13 +1143,18 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 font-mono text-[#7d6b5d]">
                           {log.student_id}
                         </td>
+                        <td className="px-6 py-4 text-[#766558]">
+                          {formatGender(log.students?.gender)}
+                        </td>
+                        <td className="px-6 py-4 text-[#766558]">
+                          {formatDepartment(log.students?.department)}
+                        </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`rounded-full px-3 py-1 text-xs font-bold tracking-wider ${
-                              log.status === "IN"
+                            className={`rounded-full px-3 py-1 text-xs font-bold tracking-wider ${log.status === "IN"
                                 ? "bg-emerald-50 text-emerald-700"
                                 : "bg-[#fff0c2] text-[#7a4a1e]"
-                            }`}
+                              }`}
                           >
                             {log.status}
                           </span>
@@ -1016,37 +1257,151 @@ export default function AdminDashboard() {
 
       {showQRModal && (
         <Modal
-          title="Generate Student Pass"
-          description="Enter the student's exact ID to generate a secure QR pass."
+          title="Generate and Email Student Pass"
+          description="Create a branded QR pass, download it, or email it directly to the student."
           onClose={() => {
             setShowQRModal(false);
             setNewStudentId("");
+            setNewStudentName("");
+            setNewStudentEmail("");
+            setNewStudentGender("MALE");
+            setNewStudentDepartment("ELECTRICAL");
+            setQrFeedback(null);
           }}
         >
-          <label className="mb-2 block text-sm font-semibold text-[#5f0a0c]">
-            Student ID
-          </label>
-          <input
-            type="text"
-            value={newStudentId}
-            onChange={(event) => setNewStudentId(event.target.value)}
-            placeholder="EG/2026/001"
-            className="w-full rounded-xl border border-[#ddcc9a] px-4 py-3 font-mono uppercase text-[#5f0a0c] outline-none transition placeholder:text-[#a99578] focus:border-[#f5ba1d] focus:ring-4 focus:ring-[#f8e2a1]/60"
-          />
+          {qrFeedback && (
+            <div
+              className={`mb-5 rounded-xl border px-4 py-3 text-sm ${qrFeedback.success
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+                }`}
+            >
+              {qrFeedback.msg}
+            </div>
+          )}
 
-          <div className="mt-6 flex min-h-64 items-center justify-center rounded-2xl border border-[#efe4c3] bg-[#fff9e9] p-6">
-            {newStudentId.trim().length > 3 ? (
-              <QRCodeSVG
-                value={newStudentId.trim().toUpperCase()}
-                size={210}
-                level="H"
+          <div className="space-y-4">
+            <FormField label="Student ID">
+              <input
+                type="text"
+                value={newStudentId}
+                onChange={(event) => {
+                  setNewStudentId(event.target.value);
+                  setQrFeedback(null);
+                }}
+                placeholder="EG/2026/001"
+                className="form-input font-mono uppercase"
               />
+            </FormField>
+
+            <FormField label="Student Full Name">
+              <input
+                type="text"
+                value={newStudentName}
+                onChange={(event) => setNewStudentName(event.target.value)}
+                placeholder="Student full name"
+                className="form-input"
+              />
+            </FormField>
+
+            <FormField label="Student Email">
+              <input
+                type="email"
+                value={newStudentEmail}
+                onChange={(event) => {
+                  setNewStudentEmail(event.target.value);
+                  setQrFeedback(null);
+                }}
+                placeholder="student@example.com"
+                className="form-input"
+              />
+            </FormField>
+            <FormField label="Gender">
+              <select
+                value={newStudentGender}
+                onChange={(event) =>
+                  setNewStudentGender(event.target.value as Gender)
+                }
+                className="form-input bg-white"
+              >
+                <option value="MALE">Male</option>
+                <option value="FEMALE">Female</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </FormField>
+
+            <FormField label="Department">
+              <select
+                value={newStudentDepartment}
+                onChange={(event) =>
+                  setNewStudentDepartment(event.target.value as Department)
+                }
+                className="form-input bg-white"
+              >
+                <option value="ELECTRICAL">Electrical Engineering</option>
+                <option value="MECHANICAL">Mechanical Engineering</option>
+                <option value="CIVIL">Civil Engineering</option>
+                <option value="COMPUTER">Computer Engineering</option>
+              </select>
+            </FormField>
+          </div>
+
+          <div className="mt-6 flex min-h-72 items-center justify-center rounded-2xl border border-[#efe4c3] bg-[#fff9e9] p-6">
+            {newStudentId.trim().length > 3 ? (
+              <div className="rounded-2xl border border-[#ead8a9] bg-white p-4 shadow-sm">
+                <QRCodeCanvas
+                  ref={qrCanvasRef}
+                  value={newStudentId.trim().toUpperCase()}
+                  size={240}
+                  level="H"
+                  includeMargin
+                  bgColor="#ffffff"
+                  fgColor="#5f0a0c"
+                  title={`Reading room pass for ${newStudentId.trim().toUpperCase()}`}
+                />
+              </div>
             ) : (
-              <p className="max-w-44 text-center text-sm text-[#87776a]">
+              <p className="max-w-52 text-center text-sm text-[#87776a]">
                 Enter a valid student ID to generate the QR code.
               </p>
             )}
           </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => void downloadStudentPass()}
+              disabled={
+                newStudentId.trim().length < 4 ||
+                !newStudentName.trim() ||
+                !newStudentEmail.trim() ||
+                qrSending
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#5f0a0c]/25 bg-white px-4 py-3 font-bold text-[#5f0a0c] transition hover:bg-[#fff2c9] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="download" className="h-4 w-4" />
+              Download PNG
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void sendStudentPassByEmail()}
+              disabled={
+                newStudentId.trim().length < 4 ||
+                !newStudentName.trim() ||
+                !newStudentEmail.trim() ||
+                qrSending
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5f0a0c] px-4 py-3 font-bold text-[#f5ba1d] transition hover:bg-[#760f12] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Icon name="mail" className="h-4 w-4" />
+              {qrSending ? "Sending..." : "Send by Email"}
+            </button>
+          </div>
+
+          <p className="mt-4 text-center text-xs leading-5 text-[#87776a]">
+            The student receives a branded PNG attachment and does not need dashboard access.
+          </p>
         </Modal>
       )}
 
@@ -1061,11 +1416,10 @@ export default function AdminDashboard() {
         >
           {staffFeedback && (
             <div
-              className={`mb-5 rounded-xl border px-4 py-3 text-sm ${
-                staffFeedback.success
+              className={`mb-5 rounded-xl border px-4 py-3 text-sm ${staffFeedback.success
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-rose-200 bg-rose-50 text-rose-700"
-              }`}
+                }`}
             >
               {staffFeedback.msg}
             </div>
@@ -1162,6 +1516,63 @@ export default function AdminDashboard() {
         }
       `}</style>
     </main>
+  );
+}
+
+function DistributionCard({
+  title,
+  subtitle,
+  rows,
+  emptyText,
+  unspecifiedCount,
+  unspecifiedLabel,
+}: {
+  title: string;
+  subtitle: string;
+  rows: Array<{ key: string; name: string; count: number; percentage: number }>;
+  emptyText: string;
+  unspecifiedCount?: number;
+  unspecifiedLabel?: string;
+}) {
+  const total = rows.reduce((sum, row) => sum + row.count, 0) +
+    (unspecifiedCount ?? 0);
+
+  return (
+    <div className="rounded-xl border border-[#e2d3ad] bg-white p-5 shadow-sm">
+      <h2 className="font-semibold text-[#5f0a0c]">{title}</h2>
+      <p className="mt-0.5 text-xs text-[#87776a]">{subtitle}</p>
+
+      <div className="mt-5 space-y-3">
+        {total === 0 ? (
+          <p className="py-4 text-center text-sm text-[#87776a]">{emptyText}</p>
+        ) : (
+          <>
+            {rows.map((row) => (
+              <div key={row.key}>
+                <div className="mb-1.5 flex items-center justify-between text-sm">
+                  <span className="font-medium text-[#4b1719]">{row.name}</span>
+                  <span className="text-[#7d6b5d]">
+                    {row.count} · {row.percentage}%
+                  </span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-[#efe7cf]">
+                  <div
+                    className="h-full rounded-full bg-[#f5ba1d]"
+                    style={{ width: `${row.percentage}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+
+            {(unspecifiedCount ?? 0) > 0 && (
+              <div className="rounded-lg bg-[#fff8e1] px-3 py-2 text-xs text-[#7d6b5d]">
+                {unspecifiedLabel}: <strong>{unspecifiedCount}</strong>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
