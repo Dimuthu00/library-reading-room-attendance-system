@@ -368,7 +368,6 @@ export default function KioskScanner() {
                   }}
                   components={{
                     finder: false,
-                    audio: false,
                     torch: true,
                     zoom: true,
                   }}

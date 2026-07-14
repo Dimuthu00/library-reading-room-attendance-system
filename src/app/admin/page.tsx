@@ -9,6 +9,7 @@ import {
   deleteStaffAccount,
   getStaffList,
 } from "@/app/actions/staff";
+import { sendStudentQrPassEmail } from "../actions/students";
 
 type UserRole = "ADMIN" | "STAFF";
 type DashboardView = "overview" | "live";
@@ -600,29 +601,16 @@ export default function AdminDashboard() {
     try {
       await saveStudentProfile();
       const qrDataUrl = await createStudentPassDataUrl();
-      const response = await fetch("/api/send-qr", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          studentId,
-          studentName: newStudentName.trim(),
-          email,
-          qrDataUrl,
-        }),
+      const result = await sendStudentQrPassEmail({
+        studentId,
+        studentName: newStudentName.trim(),
+        email,
+        qrDataUrl,
       });
 
-      const result = (await response.json()) as {
-        success?: boolean;
-        message?: string;
-      };
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "The email could not be sent.");
-      }
-
       setQrFeedback({
-        success: true,
-        msg: `QR pass sent successfully to ${email}.`,
+        success: result.success,
+        msg: result.message,
       });
     } catch (error) {
       setQrFeedback({
@@ -1395,7 +1383,7 @@ export default function AdminDashboard() {
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#5f0a0c] px-4 py-3 font-bold text-[#f5ba1d] transition hover:bg-[#760f12] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Icon name="mail" className="h-4 w-4" />
-              {qrSending ? "Sending..." : "Send by Email"}
+              {qrSending ? "Sending..." : "Save & Email QR"}
             </button>
           </div>
 
